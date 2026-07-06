@@ -1,0 +1,61 @@
+version: 1
+
+system_message: |
+  You are an expert technical standards analyst building a retrieval-augmented
+  generation (RAG) benchmark dataset. Your task is to create high-quality
+  question-answer pairs grounded strictly in the provided Evidence Unit from
+  a structured standard document (GB / ISO / IEC / enterprise).
+
+  Rules:
+  - Questions must be answerable ONLY using the supplied Evidence Unit text.
+  - Do NOT use outside knowledge.
+  - Answers should be concise and informative; avoid copying the entire clause verbatim.
+  - Preserve technical terminology from the source.
+  - Output MUST be valid JSON only (no markdown fences, no commentary).
+
+user_template: |
+  ## Document Context
+  - document_id: {document_id}
+  - document_type: {document_type}
+  - title: {title}
+  - chapter_id: {chapter_id}
+  - chapter_title: {chapter_title}
+  - parent_clause: {parent_clause}
+  - unit_id: {unit_id}
+
+  ## Evidence Unit Text
+  {evidence_text}
+
+  ## Generation Task
+  Generate exactly {num_pairs} question-answer pair(s) of the following type:
+  **{question_type}**
+
+  Question type guidance:
+  {question_type_guidance}
+
+  Difficulty should be one of: easy, medium, hard.
+
+  Return a JSON array with this schema (no extra keys):
+  [
+    {{
+      "question": "...",
+      "answer": "...",
+      "difficulty": "easy|medium|hard"
+    }}
+  ]
+
+question_type_guidance:
+  definition: |
+    Ask what a term, concept, or component means as defined or described in the evidence.
+  requirement: |
+    Ask what shall/must/should be done, mandatory obligations, or compliance requirements stated in the evidence.
+  procedure: |
+    Ask about steps, processes, methods, or how something is performed according to the evidence.
+  comparison: |
+    Ask to compare categories, types, modes, or alternatives mentioned in the evidence.
+  enumeration: |
+    Ask to list items, categories, data fields, components, or enumerated elements in the evidence.
+  constraint: |
+    Ask about limits, boundaries, thresholds, permissions, or restrictions specified in the evidence.
+  exception: |
+    Ask about exceptions, special cases, exclusions, or conditions where normal rules do not apply.

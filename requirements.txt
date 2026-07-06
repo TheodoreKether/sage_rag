@@ -1,0 +1,19 @@
+# PDF parsing
+pymupdf
+pdfplumber
+
+# Vector search
+faiss-cpu
+
+# Data processing
+numpy
+pandas
+tqdm
+matplotlib
+pyyaml
+
+# Embeddings
+sentence-transformers
+
+# Sparse retrieval
+rank-bm25

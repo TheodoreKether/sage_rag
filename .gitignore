@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.env
+
+# Data & indexes (generated artifacts)
+data/raw_pdf/*
+!data/raw_pdf/.gitkeep
+data/parsed_json/*
+!data/parsed_json/.gitkeep
+data/chunks/*
+!data/chunks/.gitkeep
+data/evidence_units/*
+!data/evidence_units/.gitkeep
+data/qa_dataset/*
+!data/qa_dataset/.gitkeep
+index/
+logs/*
+!logs/.gitkeep
+results/*
+!results/.gitkeep
+
+# IDE
+.idea/
+.vscode/
+*.swp
