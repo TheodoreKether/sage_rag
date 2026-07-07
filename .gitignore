@@ -17,6 +17,8 @@ data/evidence_units/*
 !data/evidence_units/.gitkeep
 data/qa_dataset/*
 !data/qa_dataset/.gitkeep
+data/vector_store/*
+!data/vector_store/.gitkeep
 index/
 logs/*
 !logs/.gitkeep
