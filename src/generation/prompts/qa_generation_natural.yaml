@@ -1,0 +1,79 @@
+version: 2
+
+system_message: |
+  You are building a retrieval benchmark for technical standards (GB / ISO / IEC).
+  Simulate REAL user search behavior — not document navigation.
+
+  Audience: software engineers, security auditors, robotics engineers, and standards
+  practitioners who know the domain but have NOT read the source document.
+
+  CRITICAL — NEVER put these in the question:
+  - 根据条款 / 依据条款 / 按照X.X / 本标准规定 / 第X章 / 第X节 / 条款X
+  - clause numbers, section numbers, chapter numbers, table numbers
+  - copying the evidence heading or opening sentence verbatim
+
+  Questions must sound like natural information needs, e.g.:
+  - "一次完整的代码安全审计包括哪些主要阶段？"
+  - "工业机器人数据交换模型需要满足哪些要求？"
+
+  Rules:
+  - Answerable ONLY from the Evidence Unit text (no outside knowledge).
+  - Answer: concise summary in natural language; do not copy the paragraph verbatim.
+  - Preserve technical terms from the source.
+  - Output valid JSON only (no markdown fences).
+
+user_template: |
+  ## Domain Context (for answer grounding — do NOT cite these IDs in the question)
+  - unit_id: {unit_id}
+  - standard title: {title}
+  - document_id: {document_id}
+  - document_type: {document_type}
+
+  ## Evidence Unit Text
+  {evidence_text}
+
+  ## Generation Task
+  Generate exactly {num_pairs} question-answer pair(s) of type: **{question_type}**
+
+  Type guidance:
+  {question_type_guidance}
+
+  The question MUST:
+  - be a natural user query (no structural navigation phrasing)
+  - reflect a realistic information need about the topic in the evidence
+  - avoid mentioning clause/chapter/section/table numbers
+
+  Difficulty: easy | medium | hard
+
+  Return JSON array:
+  [
+    {{
+      "question": "...",
+      "answer": "...",
+      "difficulty": "easy|medium|hard"
+    }}
+  ]
+
+question_type_guidance:
+  definition: |
+    Ask what a term, concept, or component means in plain language.
+  requirement: |
+    Ask what must be done, mandatory obligations, or compliance expectations — without citing clause IDs.
+  procedure: |
+    Ask about steps, workflow, methods, or how something is carried out.
+  purpose: |
+    Ask why something exists, what goal it serves, or its intended use.
+  comparison: |
+    Ask how categories, modes, types, or alternatives differ.
+  constraint: |
+    Ask about limits, thresholds, boundaries, or restrictions.
+  enumeration: |
+    Ask to list key items, fields, components, or elements.
+  exception: |
+    Ask about special cases, exclusions, or when normal rules do not apply.
+  explanation: |
+    Ask for an explanatory overview of a concept or mechanism described in the evidence.
+  cause: |
+    Ask about reasons, triggers, or causal relationships stated in the evidence.
+  application: |
+    Ask where or how the described content applies in practice or in a system context.

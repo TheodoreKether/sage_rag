@@ -268,7 +268,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--report",
-        default="results/embedding_report.md",
+        default="results/benchmark/embedding_report.md",
         help="Markdown report output path",
     )
     parser.add_argument(

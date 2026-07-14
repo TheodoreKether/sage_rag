@@ -75,7 +75,7 @@ def render_dense_report(summary: EvaluationSummary) -> str:
             "## Notes",
             "",
             "- Ground truth: `supporting_evidence[].unit_id` from the QA dataset.",
-            "- Per-question results (including Top-K scores) are saved in `results/retrieval_results.jsonl`.",
+            "- Per-question results (including Top-K scores) are saved in `results/retrieval/dense/retrieval_results.jsonl`.",
             "- Metrics are retriever-agnostic; swap the retriever to evaluate BM25 / Hybrid / SAGE-RAG.",
             "",
         ]

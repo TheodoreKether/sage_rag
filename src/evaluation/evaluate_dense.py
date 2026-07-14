@@ -31,8 +31,8 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_RESULTS_PATH = Path("results/retrieval_results.jsonl")
-DEFAULT_REPORT_PATH = Path("results/retrieval_dense_report.md")
+DEFAULT_RESULTS_PATH = Path("results/retrieval/dense/retrieval_results.jsonl")
+DEFAULT_REPORT_PATH = Path("results/retrieval/dense/retrieval_dense_report.md")
 
 
 @dataclass

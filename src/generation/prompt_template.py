@@ -8,17 +8,28 @@ from typing import Any
 
 import yaml
 
-DEFAULT_PROMPT_FILE = Path(__file__).resolve().parent / "prompts" / "qa_generation.yaml"
+PROMPTS_DIR = Path(__file__).resolve().parent / "prompts"
+DEFAULT_PROMPT_FILE = PROMPTS_DIR / "qa_generation_natural.yaml"
+LEGACY_PROMPT_FILE = PROMPTS_DIR / "qa_generation.yaml"
 
 QUESTION_TYPES = (
     "definition",
     "requirement",
     "procedure",
+    "purpose",
     "comparison",
-    "enumeration",
     "constraint",
+    "enumeration",
     "exception",
+    "explanation",
+    "cause",
+    "application",
 )
+
+# Lower weight for requirement during type sampling (index used for weighted pick).
+QUESTION_TYPE_WEIGHTS: dict[str, float] = {
+    "requirement": 0.6,
+}
 
 
 @lru_cache(maxsize=4)

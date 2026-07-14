@@ -652,12 +652,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--markdown",
-        default="results/dataset_profile.md",
+        default="results/benchmark/dataset_profile.md",
         help="Output markdown report path",
     )
     parser.add_argument(
         "--json",
-        default="results/dataset_statistics.json",
+        default="results/tables/dataset_statistics.json",
         help="Output JSON statistics path",
     )
     parser.add_argument(

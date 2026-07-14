@@ -24,6 +24,9 @@ logs/*
 !logs/.gitkeep
 results/*
 !results/.gitkeep
+!results/**/.gitkeep
+baselines/*
+!baselines/**/.gitkeep
 
 # IDE
 .idea/

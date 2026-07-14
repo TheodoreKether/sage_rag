@@ -395,7 +395,7 @@ def run_builder(
     jsonl_path = output_dir / "evidence_units.jsonl"
     write_jsonl(result.units, jsonl_path)
 
-    stats_path = stats_path or Path("results/evidence_statistics.md")
+    stats_path = stats_path or Path("results/benchmark/evidence_statistics.md")
     stats_path.parent.mkdir(parents=True, exist_ok=True)
     stats_path.write_text(
         render_statistics_markdown(result.units, result.warnings),
@@ -426,7 +426,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--stats",
-        default="results/evidence_statistics.md",
+        default="results/benchmark/evidence_statistics.md",
         help="Markdown statistics report path",
     )
     parser.add_argument("--verbose", "-v", action="store_true")
