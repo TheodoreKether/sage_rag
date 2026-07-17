@@ -17,3 +17,4 @@ sentence-transformers
 
 # Sparse retrieval
 rank-bm25
+jieba
