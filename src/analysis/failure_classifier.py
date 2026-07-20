@@ -36,6 +36,7 @@ class UnitInfo:
     text: str
     contains_table: bool = False
     contains_appendix: bool = False
+    title: str = ""
 
     @classmethod
     def from_record(cls, record: dict[str, Any]) -> UnitInfo:
@@ -53,6 +54,7 @@ class UnitInfo:
             text=text,
             contains_table=bool(meta.get("contains_table")),
             contains_appendix=bool(meta.get("contains_appendix")),
+            title=str(record.get("title") or ""),
         )
 
     @property

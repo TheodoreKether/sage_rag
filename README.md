@@ -206,46 +206,79 @@ python scripts/compare_qa_benchmarks.py
 
 ---
 
-## Step 7：Failure Analysis
+## Clean Benchmark（推荐论文评测集）
+
+去除 Dataset / Annotation Issue 后的可靠评测集：
+
+```bash
+# 1) 构建 clean QA（剔除 Q–Gold 不一致）
+python scripts/build_qa_clean.py
+# → data/qa_dataset/qa_pairs_clean.jsonl
+# → results/retrieval/clean_benchmark/cleaning_log.*
+
+# 2) 在 clean QA 上重跑三条基线（不改检索代码）
+# 建议使用已安装 faiss 的环境，例如: conda activate ailearn
+python scripts/evaluate_clean_benchmark.py
+# → results/retrieval/clean_benchmark/{dense,bm25,hybrid}_metrics.json
+# → evaluation_report.md / comparison.md
+
+# 3) Clean Root Cause Analysis（不含 Dataset Issue）
+python scripts/run_root_cause_analysis_clean.py
+# → results/root_cause_analysis_clean/
+```
+
+**Clean 结果（460 queries）：** BM25 Recall@10 **82.61%**，Hybrid **78.26%**，Dense **65.43%**（均高于原始 V2）。详见 [results/retrieval/clean_benchmark/comparison.md](results/retrieval/clean_benchmark/comparison.md)。
+
+---
+
+## Step 7：Failure Analysis / Root Cause Analysis
 
 在三条基线的 `retrieval_results*.jsonl` 就绪后运行（**不修改检索代码、不重跑检索**）：
 
 ```bash
+# 快速失败分布（早期框架）
 python scripts/run_failure_analysis.py
-# 输出: results/failure_analysis/
-#   failure_statistics.json / .md
+# → results/failure_analysis/
+
+# 论文级 Root Cause Analysis（推荐：含 Dataset Issue 过滤）
+python scripts/run_root_cause_analysis.py
+# → results/root_cause_analysis/
+#   root_cause_statistics.json
+#   root_cause_analysis.md
 #   failure_examples.md
-#   failure_distribution.png
 #   design_motivation.md
+#   failure_comparison.md
 ```
 
-失败类别包括：Hierarchical / Cross-document / Version / Table / Appendix / Cross-reference / Semantic / Lexical（Dense 命中且 BM25 未命中）。
+失败类别包括：Dataset Issue / Hierarchical / Cross-reference / Table / Appendix / Version / Multi-clause / Semantic / Lexical。
 
 ---
 
 ## 当前基准结果
 
-基于 **QA V2（对齐改写后）** 全量评测：492 queries，top_k=10。完整对比见 [results/retrieval/hybrid_vs_baselines.md](results/retrieval/hybrid_vs_baselines.md)。
+### Clean Benchmark（推荐，460 queries）
 
-| Retriever | Recall@1 | Recall@5 | Recall@10 | MRR | nDCG@10 |
-|-----------|---------:|---------:|----------:|----:|--------:|
-| BM25 | **0.5081** | **0.7276** | **78.66%** | **0.6071** | **0.6509** |
-| Hybrid (RRF) | 0.4492 | 0.6789 | 74.19% | 0.5447 | 0.5924 |
-| Dense (BGE-M3) | 0.3659 | 0.5366 | 61.99% | 0.4416 | 0.4839 |
+去除 Dataset Issue 后：
 
-**结论：** BM25 仍为最强基线；Hybrid 明显优于 Dense，但尚未超过 BM25。QA 对齐改写后三条基线 Recall@10 均较改写前提升约 8–10 个百分点（改写前约 BM25 70.5% / Hybrid 65.9% / Dense 52.4%），说明此前部分「假失败」来自问题–Gold 错位。
+| Retriever | Recall@1 | Recall@5 | Recall@10 | MRR |
+|-----------|---------:|---------:|----------:|----:|
+| BM25 | **0.5435** | **0.7652** | **82.61%** | **0.6439** |
+| Hybrid (RRF) | 0.4783 | 0.7152 | 78.26% | 0.5777 |
+| Dense (BGE-M3) | 0.3913 | 0.5674 | 65.43% | 0.4698 |
 
-V1 模板化 QA（878）Dense Recall@10 约 4.4%，含「根据条款…」等结构导航用语，不适合作为检索主评测集。
+### Original QA V2（492 queries，含标注噪声）
 
-### Failure Analysis（改写后）
+| Retriever | Recall@10 | MRR |
+|-----------|----------:|----:|
+| BM25 | 78.66% | 0.6071 |
+| Hybrid (RRF) | 74.19% | 0.5447 |
+| Dense (BGE-M3) | 61.99% | 0.4416 |
 
-| Retriever | Failures (Recall@10 miss) | Failure Rate |
-|-----------|--------------------------:|-------------:|
-| BM25 | 105 | 21.34% |
-| Hybrid | 127 | 25.81% |
-| Dense | 187 | 38.01% |
+清洗使三条基线 Recall@10 约提升 **+3.4 ~ +4.1 pp**，说明部分失败来自 QA–Gold 不一致而非检索器。相对排序不变：BM25 > Hybrid > Dense。
 
-Hybrid 主要失败类别仍集中在 Semantic / Appendix / Cross-document / Version / Cross-reference 等，用于动机化 SAGE-RAG 结构模块。详见 [results/failure_analysis/](results/failure_analysis/)。
+Clean Hybrid 残留失败（100）以 **Version (37) / Appendix (25) / Semantic (25)** 为主，详见 [results/root_cause_analysis_clean/](results/root_cause_analysis_clean/)。
+
+V1 模板化 QA（878）Dense Recall@10 约 4.4%，不适合作为检索主评测集。
 
 ---
 
