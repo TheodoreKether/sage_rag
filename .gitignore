@@ -17,6 +17,8 @@ data/evidence_units/*
 !data/evidence_units/.gitkeep
 data/qa_dataset/*
 !data/qa_dataset/.gitkeep
+data/bm25_index/*
+!data/bm25_index/.gitkeep
 data/vector_store/*
 !data/vector_store/.gitkeep
 index/
@@ -28,7 +30,8 @@ results/*
 baselines/*
 !baselines/**/.gitkeep
 
-# IDE
+# Local backups / IDE
+*.bak*
 .idea/
 .vscode/
 *.swp
