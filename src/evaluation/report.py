@@ -21,6 +21,8 @@ class EvaluationSummary:
     elapsed_seconds: float
     average_metrics: dict[str, float] = field(default_factory=dict)
     dataset_stats: dict[str, Any] = field(default_factory=dict)
+    results_jsonl: str = "results/retrieval/dense/retrieval_results.jsonl"
+    report_title: str = "Retrieval Evaluation Report"
 
     def metric(self, name: str) -> float:
         return float(self.average_metrics.get(name, 0.0))
@@ -28,7 +30,7 @@ class EvaluationSummary:
 
 def render_dense_report(summary: EvaluationSummary) -> str:
     lines = [
-        "# Dense Retrieval Evaluation Report",
+        f"# {summary.report_title}",
         "",
         "## Dataset Statistics",
         "",
@@ -75,7 +77,7 @@ def render_dense_report(summary: EvaluationSummary) -> str:
             "## Notes",
             "",
             "- Ground truth: `supporting_evidence[].unit_id` from the QA dataset.",
-            "- Per-question results (including Top-K scores) are saved in `results/retrieval/dense/retrieval_results.jsonl`.",
+            f"- Per-question results (including Top-K scores) are saved in `{summary.results_jsonl}`.",
             "- Metrics are retriever-agnostic; swap the retriever to evaluate BM25 / Hybrid / SAGE-RAG.",
             "",
         ]

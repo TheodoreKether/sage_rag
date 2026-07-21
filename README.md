@@ -17,11 +17,13 @@
 | 3. 检索基线 | ✅ | Dense / BM25 / Hybrid（RRF） |
 | 4. Root Cause Analysis | ✅ | 过滤 Dataset Issue 后的失败归因 |
 | 5. Design Motivation | ✅ | 结构模块动机初稿（无算法） |
-| 6. SAGE-RAG 方法 | 🔜 | Hierarchical / Cross-ref / Table / Appendix 图检索 |
+| 6. SAGE-RAG 图构建 | ✅ | Evidence Unit → Standard Evidence Graph（层级 / 相邻 / 引用） |
+| 7. SAGE-RAG 检索 | 🔜 | 结构感知检索器 + Clean Benchmark 对比 |
 
 **论文主评测集：** `data/qa_dataset/qa_pairs_clean.jsonl`（460 queries）  
 **主实验结果：** `results/retrieval/clean_benchmark/`  
-**主失败分析：** `results/root_cause_analysis_clean/`
+**主失败分析：** `results/root_cause_analysis_clean/`  
+**结构图：** `data/sage_graph/`（统计见 `results/sage_graph_statistics.md`）
 
 ---
 
@@ -43,7 +45,10 @@ sage_rag/
 │   ├── generation/              # QA 生成与自然语言质量检查
 │   ├── retrieval/               # Dense / BM25 / Hybrid / RRF
 │   ├── evaluation/              # 检索指标与报告
-│   └── analysis/                # 对齐检测、失败分类、Root Cause
+│   ├── analysis/                # 对齐检测、失败分类、Root Cause
+│   └── sage_rag/                # ★ SAGE-RAG（结构证据图）
+│       ├── build_graph.py       # CLI：EU → Graph
+│       └── graph/               # schema / builder / store
 │
 ├── scripts/                     # 实验脚本（见下方）
 ├── docs/                        # 设计说明
@@ -53,6 +58,10 @@ sage_rag/
 │   ├── raw_pdf/                 # 原始标准 PDF（13）
 │   ├── parsed_json/             # 结构化解析结果
 │   ├── evidence_units/          # 565 条 Evidence Units
+│   ├── sage_graph/              # ★ Standard Evidence Graph
+│   │   ├── nodes.jsonl
+│   │   ├── edges.jsonl
+│   │   └── graph_statistics.md
 │   ├── vector_store/            # Dense FAISS 索引
 │   ├── bm25_index/              # BM25 索引
 │   └── qa_dataset/
@@ -68,6 +77,7 @@ sage_rag/
     │   ├── clean_benchmark/     # ★ Clean 三基线指标与对比
     │   ├── bm25_vs_dense.md
     │   └── hybrid_vs_baselines.md
+    ├── sage_graph_statistics.md # ★ 结构图节点/边统计
     ├── root_cause_analysis/     # V2 全量 RCA（含 Dataset Issue）
     ├── root_cause_analysis_clean/  # ★ Clean RCA + Design Motivation
     ├── qa_quality/              # QA 对齐审计与改写日志
@@ -81,6 +91,7 @@ sage_rag/
 
 | 脚本 | 用途 |
 |------|------|
+| `src/sage_rag/build_graph.py` | ★ Evidence Unit → Standard Evidence Graph |
 | `scripts/build_bm25_index.py` | 构建 BM25 索引 |
 | `scripts/evaluate_hybrid.py` | Hybrid 评测 |
 | `scripts/build_qa_clean.py` | 剔除 Dataset Issue → Clean QA |
@@ -120,6 +131,33 @@ sage_rag/
 
 ---
 
+## Standard Evidence Graph（已完成）
+
+由 Evidence Units 构建轻量异构结构图 `G=(V,E)`，**不使用 LLM 抽实体**，只利用标准文档显式结构。
+
+| 节点 | id 约定 | 数量 |
+|------|---------|-----:|
+| document | `{document_id}` | 13 |
+| chapter | `{doc}::chapter::{chapter_id}` | 81 |
+| clause | `{doc}::clause::{parent_clause}` | 500 |
+| evidence | `{unit_id}`（不变） | 565 |
+
+| 边 | 含义 | 权重 | 数量 |
+|----|------|-----:|-----:|
+| `parent_of` | document → chapter → clause → evidence | 1.0 | 1147 |
+| `next_to` | 同章相邻条款 | 0.3 | 420 |
+| `refers_to` | 规则匹配交叉引用（见 / 参见 / 附录 / GB/T / ISO） | 0.5 | 245 |
+
+```bash
+python src/sage_rag/build_graph.py \
+  --input data/evidence_units/evidence_units.jsonl \
+  --output data/sage_graph
+```
+
+产出：`data/sage_graph/{nodes,edges}.jsonl`、`graph_statistics.md`，并同步 `results/sage_graph_statistics.md`。
+
+---
+
 ## 环境准备
 
 ```bash
@@ -151,6 +189,11 @@ python evaluate_bm25.py --qa data/qa_dataset/qa_pairs_v2.jsonl --top-k 10
 python scripts/evaluate_hybrid.py --qa data/qa_dataset/qa_pairs_v2.jsonl --top-k 10
 python scripts/compare_hybrid_baselines.py
 python scripts/run_root_cause_analysis.py
+
+# C. Standard Evidence Graph（SAGE-RAG 图构建）
+python src/sage_rag/build_graph.py \
+  --input data/evidence_units/evidence_units.jsonl \
+  --output data/sage_graph
 ```
 
 ### 从 PDF 完整重建
@@ -159,10 +202,11 @@ python scripts/run_root_cause_analysis.py
 |------|------|------|
 | 1 解析 | `python src/parsing/pdf_to_structure.py --input data/raw_pdf --output data/parsed_json` | `parsed_json/` |
 | 2 切分 | `python src/chunking/build_evidence_units.py --input data/parsed_json --output data/evidence_units` | `evidence_units.jsonl` |
-| 3 Dense 索引 | `python src/embedding/build_index.py --input data/evidence_units/evidence_units.jsonl --output data/vector_store` | `vector_store/` |
-| 4 BM25 索引 | `python scripts/build_bm25_index.py` | `bm25_index/` |
-| 5 QA V2 | `python scripts/regenerate_qa.py --full -o data/qa_dataset/qa_pairs_v2.jsonl` | `qa_pairs_v2.jsonl` |
-| 6 Clean + 评测 | 见上方「快速复现 A」 | `clean_benchmark/` 等 |
+| 3 结构图 | `python src/sage_rag/build_graph.py --input data/evidence_units/evidence_units.jsonl --output data/sage_graph` | `sage_graph/` |
+| 4 Dense 索引 | `python src/embedding/build_index.py --input data/evidence_units/evidence_units.jsonl --output data/vector_store` | `vector_store/` |
+| 5 BM25 索引 | `python scripts/build_bm25_index.py` | `bm25_index/` |
+| 6 QA V2 | `python scripts/regenerate_qa.py --full -o data/qa_dataset/qa_pairs_v2.jsonl` | `qa_pairs_v2.jsonl` |
+| 7 Clean + 评测 | 见上方「快速复现 A」 | `clean_benchmark/` 等 |
 
 ---
 
@@ -173,6 +217,7 @@ python scripts/run_root_cause_analysis.py
 ```
 data/
 ├── evidence_units/evidence_units.jsonl   # 565
+├── sage_graph/                           # Standard Evidence Graph
 ├── vector_store/                         # FAISS
 ├── bm25_index/
 └── qa_dataset/
@@ -184,6 +229,7 @@ data/
 |------|------|
 | PDF | 13 |
 | Evidence Units | 565 |
+| Graph nodes / edges | 1159 / 1812 |
 | QA V2 / Clean | 492 / 460 |
 
 ---
@@ -197,6 +243,7 @@ data/
 | Clean 失败分布 | `results/root_cause_analysis_clean/root_cause_clean_statistics.md` |
 | Clean 失败案例 | `results/root_cause_analysis_clean/root_cause_clean_examples.md` |
 | Design Motivation | `results/root_cause_analysis_clean/design_motivation.md` |
+| 结构图统计 | `results/sage_graph_statistics.md` |
 | V2 三基线对比 | `results/retrieval/hybrid_vs_baselines.md` |
 | QA 清洗日志 | `results/retrieval/clean_benchmark/cleaning_log.md` |
 | QA 对齐/改写 | `results/qa_quality/` |
@@ -205,13 +252,12 @@ data/
 
 ## 下一步
 
-实现 **SAGE-RAG** 结构感知检索模块，并在 Clean Benchmark 上与 BM25 / Dense / Hybrid 对比：
+在 Standard Evidence Graph 之上实现 **SAGE-RAG 结构感知检索**，并在 Clean Benchmark 上与 BM25 / Dense / Hybrid 对比：
 
-1. Document / Version Relation  
-2. Appendix–Evidence Relation  
-3. Cross-reference Graph  
-4. Clause Hierarchy Graph  
-5. Table–Evidence Relation  
+1. Hierarchy-aware retrieval（沿 `parent_of` / `next_to` 扩展）  
+2. Cross-reference expansion（沿 `refers_to`）  
+3. Appendix / Table 定向召回  
+4. Document / Version 消歧  
 
 ---
 

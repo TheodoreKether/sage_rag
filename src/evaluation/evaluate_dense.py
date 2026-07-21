@@ -221,6 +221,8 @@ def run_retrieval_evaluation(
         elapsed_seconds=elapsed,
         average_metrics=average_metrics(metric_rows),
         dataset_stats=compute_dataset_stats(eval_samples),
+        results_jsonl=str(results_path) if results_path else "results/retrieval/dense/retrieval_results.jsonl",
+        report_title="Dense Retrieval Evaluation Report",
     )
 
     if results_path:

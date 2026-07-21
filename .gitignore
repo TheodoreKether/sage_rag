@@ -21,6 +21,8 @@ data/bm25_index/*
 !data/bm25_index/.gitkeep
 data/vector_store/*
 !data/vector_store/.gitkeep
+data/sage_graph/*
+!data/sage_graph/.gitkeep
 index/
 logs/*
 !logs/.gitkeep
@@ -29,6 +31,24 @@ results/*
 !results/**/.gitkeep
 baselines/*
 !baselines/**/.gitkeep
+# Track LightRAG adapter/scripts/docs; keep official clone & runtime artifacts local
+!baselines/lightrag/
+baselines/lightrag/*
+!baselines/lightrag/adapter/
+!baselines/lightrag/adapter/**
+!baselines/lightrag/scripts/
+!baselines/lightrag/scripts/**
+!baselines/lightrag/README.md
+!baselines/lightrag/.env.example
+!baselines/lightrag/.gitkeep
+baselines/lightrag/LightRAG/
+baselines/lightrag/rag_storage/
+baselines/lightrag/rag_storage_smoke/
+baselines/lightrag/maps/
+baselines/lightrag/results/
+baselines/lightrag/.venv/
+baselines/lightrag/.env
+baselines/lightrag/.tiktoken_cache/
 
 # Local backups / IDE
 *.bak*
