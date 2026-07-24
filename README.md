@@ -16,14 +16,62 @@
 | 2. QA 评测集 | ✅ | V2 自然语言 QA（492）→ 对齐改写 → **Clean（460）** |
 | 3. 检索基线 | ✅ | Dense / BM25 / Hybrid（RRF） |
 | 4. Root Cause Analysis | ✅ | 过滤 Dataset Issue 后的失败归因 |
-| 5. Design Motivation | ✅ | 结构模块动机初稿（无算法） |
-| 6. SAGE-RAG 图构建 | ✅ | Evidence Unit → Standard Evidence Graph（层级 / 相邻 / 引用） |
-| 7. SAGE-RAG 检索 | 🔜 | 结构感知检索器 + Clean Benchmark 对比 |
+| 5. Design Motivation | ✅ | 结构模块动机初稿 |
+| 6. SAGE-RAG 图构建 | ✅ | Evidence Unit → Standard Evidence Graph |
+| 7. Graph Store + Expansion | ✅ | 内存图索引 + depth=1 结构扩展（pool recall ≈91.5%） |
+| 8. SAGE v1 Ranking | ✅ | retrieval ⊕ graph 规则打分 |
+| 9. SAGE v2 Selection | ✅ | Greedy structure-aware evidence selection |
+| 10. SAGE v3 Allocation | ✅ | 硬槽位把 expanded 塞进 Top10（宏观指标回退） |
+| 11. SAGE v4 Risk-aware | ✅ | Retr + Struct + Cov − Risk；首次 R@10 略超 BM25 |
+| 12. SAGE v5 Semantic | ✅ | BM25 semantic rescoring + initial_k=20；R@10=**85.00%** |
+| 13. Dense+Graph 实验 | ✅ | Dense 校准 expanded 排序；Hybrid 融合 R@10=**86.09%** |
 
 **论文主评测集：** `data/qa_dataset/qa_pairs_clean.jsonl`（460 queries）  
-**主实验结果：** `results/retrieval/clean_benchmark/`  
+**主基线结果：** `results/retrieval/clean_benchmark/`  
+**当前最优 SAGE：** Hybrid BM25+Dense+Graph → `results/retrieval/sage_dense_graph/`  
 **主失败分析：** `results/root_cause_analysis_clean/`  
 **结构图：** `data/sage_graph/`（统计见 `results/sage_graph_statistics.md`）
+
+---
+
+## 主实验结果（Clean Benchmark，460 queries）
+
+### 基线
+
+| Retriever | Recall@1 | Recall@5 | Recall@10 | MRR |
+|-----------|---------:|---------:|----------:|----:|
+| BM25 | 0.5435 | 0.7652 | 0.8261 | 0.6439 |
+| Hybrid (RRF) | 0.4783 | 0.7152 | 0.7826 | 0.5777 |
+| Dense (BGE-M3) | 0.3913 | 0.5674 | 0.6543 | 0.4698 |
+
+相对排序：**BM25 > Hybrid > Dense**。详见 [results/retrieval/clean_benchmark/comparison.md](results/retrieval/clean_benchmark/comparison.md)。
+
+### SAGE 演进（BM25 作候选生成）
+
+| Method | R@1 | R@5 | R@10 | MRR | nDCG@10 | 要点 |
+|--------|----:|----:|-----:|----:|--------:|------|
+| BM25 baseline | 0.5435 | 0.7652 | 0.8261 | 0.6439 | 0.6884 | 强 lexical 基线 |
+| Expansion pool (k=20) | — | — | **0.9152** | — | — | Graph 扩大候选 recall |
+| SAGE v4 Risk-aware | 0.5957 | 0.8065 | 0.8283 | 0.6809 | 0.7173 | 首次略超 BM25 |
+| SAGE v5 BM25 semantic | 0.5913 | 0.8022 | 0.8500 | 0.6801 | 0.7214 | initial_k=20 为主因；expand-gold 进 Top10=**0%** |
+| A: Dense ranking + Graph | 0.4739 | 0.7348 | 0.8043 | 0.5877 | 0.6405 | expand 提升 30%，整体 R@10 下降 |
+| **H: BM25+Dense+Graph** | **0.6000** | **0.8130** | **0.8609** | **0.6883** | **0.7302** | **当前最优** |
+
+### 关键结论（Dense+Graph 实验）
+
+假设：*Graph expansion improves candidate recall, while dense semantic relevance helps rank structurally expanded evidence.*
+
+| Claim | 结果 |
+|-------|------|
+| Graph 提升候选 recall | ✅ 成立（pool R@10 91.52%） |
+| Dense 帮助 expanded 排序 | ✅ 机制成立（v5: 0% → A: **30%** promotion） |
+| Dense **替换** BM25 终排 | ❌ 不成立（A R@10 80.43% < v5） |
+| BM25 + Dense + Graph 融合 | ✅ 成立（H 最优 R@10 **86.09%**） |
+
+Expanded gold 按边类型（A）：`parent_of` 2/2，`refers_to` 3/8，`next_to` 1/10。
+
+→ **Dense 解决的是「扩出来的证据排不上去」，不是「替代 BM25」。**  
+完整报告：`results/retrieval/sage_dense_graph/{comparison,ablation,evaluation_report,failure_cases}.md`
 
 ---
 
@@ -33,128 +81,106 @@
 sage_rag/
 ├── README.md
 ├── requirements.txt
-├── build_qa_dataset.py          # 模板 QA（V1）CLI
-├── evaluate_dense.py            # Dense 评测入口
-├── evaluate_bm25.py             # BM25 评测入口
-├── test_dense_retriever.py      # Dense 冒烟测试
+├── build_qa_dataset.py / evaluate_dense.py / evaluate_bm25.py
 │
-├── src/                         # 核心代码
-│   ├── parsing/                 # PDF → 结构化 JSON
-│   ├── chunking/                # Evidence Unit 构建
-│   ├── embedding/               # BGE-M3 + FAISS
-│   ├── generation/              # QA 生成与自然语言质量检查
+├── src/
+│   ├── parsing/ chunking/ embedding/ generation/
 │   ├── retrieval/               # Dense / BM25 / Hybrid / RRF
-│   ├── evaluation/              # 检索指标与报告
-│   ├── analysis/                # 对齐检测、失败分类、Root Cause
-│   └── sage_rag/                # ★ SAGE-RAG（结构证据图）
-│       ├── build_graph.py       # CLI：EU → Graph
-│       └── graph/               # schema / builder / store
+│   ├── evaluation/              # 指标、报告、SAGE 各版本评测入口
+│   │   ├── evaluate_sage.py … evaluate_sage_v5.py
+│   │   ├── evaluate_sage_dense_graph.py   # ★ Dense+Graph 实验
+│   │   └── analyze_expanded_bottleneck.py
+│   ├── analysis/
+│   └── sage_rag/                # ★ SAGE-RAG
+│       ├── build_graph.py
+│       ├── graph/               # schema / builder / store
+│       ├── expansion/           # GraphExpander (depth=1)
+│       ├── ranking/
+│       │   ├── structure_ranker.py / structure_ranker_v2.py
+│       │   ├── risk_aware_ranker.py / risk_aware_ranker_v5.py
+│       │   ├── semantic_rescorer.py       # BM25 semantic (v5)
+│       │   ├── dense_rescorer.py          # ★ BGE-M3 cosine
+│       │   └── dense_graph_ranker.py      # ★ Dense / Hybrid 终排
+│       └── retrieval/
+│           ├── sage_expansion_retriever.py
+│           ├── sage_retriever.py … sage_retriever_v5.py
+│           ├── candidate_allocator.py     # v3
+│           └── sage_dense_graph_retriever.py  # ★ Dense+Graph
 │
-├── scripts/                     # 实验脚本（见下方）
-├── docs/                        # 设计说明
-├── configs/ baselines/ tests/   # 预留
+├── scripts/  docs/  configs/  baselines/  tests/
 │
 ├── data/                        # 本地数据（默认不入 Git）
-│   ├── raw_pdf/                 # 原始标准 PDF（13）
-│   ├── parsed_json/             # 结构化解析结果
-│   ├── evidence_units/          # 565 条 Evidence Units
-│   ├── sage_graph/              # ★ Standard Evidence Graph
-│   │   ├── nodes.jsonl
-│   │   ├── edges.jsonl
-│   │   └── graph_statistics.md
-│   ├── vector_store/            # Dense FAISS 索引
-│   ├── bm25_index/              # BM25 索引
-│   └── qa_dataset/
-│       ├── qa_pairs_v1.jsonl    # 模板化 QA（对照）
-│       ├── qa_pairs_v2.jsonl    # 自然语言 QA（492，已改写）
-│       └── qa_pairs_clean.jsonl # ★ 论文 Clean Benchmark（460）
+│   ├── raw_pdf/ parsed_json/ evidence_units/
+│   ├── sage_graph/              # Standard Evidence Graph
+│   ├── vector_store/            # Dense FAISS + embeddings.npy
+│   ├── bm25_index/
+│   └── qa_dataset/qa_pairs_clean.jsonl   # ★ 460
 │
-└── results/                     # 实验产出（论文材料）
-    ├── retrieval/
-    │   ├── dense/               # V2（及 V1 对照）Dense 结果
-    │   ├── bm25/                # V2 BM25 结果
-    │   ├── hybrid/              # V2 Hybrid 结果
-    │   ├── clean_benchmark/     # ★ Clean 三基线指标与对比
-    │   ├── bm25_vs_dense.md
-    │   └── hybrid_vs_baselines.md
-    ├── sage_graph_statistics.md # ★ 结构图节点/边统计
-    ├── root_cause_analysis/     # V2 全量 RCA（含 Dataset Issue）
-    ├── root_cause_analysis_clean/  # ★ Clean RCA + Design Motivation
-    ├── qa_quality/              # QA 对齐审计与改写日志
-    ├── ablation/                # V1 vs V2 Dense 对照
-    ├── benchmark/               # 数据画像、索引报告
-    ├── figures/ tables/         # 统计图 / 表
-    └── logs/
+└── results/retrieval/
+    ├── clean_benchmark/         # ★ 三基线
+    ├── sage/ … sage_v5/         # SAGE 各版本
+    └── sage_dense_graph/        # ★ Dense+Graph 实验
 ```
 
 ### 关键脚本一览
 
 | 脚本 | 用途 |
 |------|------|
-| `src/sage_rag/build_graph.py` | ★ Evidence Unit → Standard Evidence Graph |
-| `scripts/build_bm25_index.py` | 构建 BM25 索引 |
-| `scripts/evaluate_hybrid.py` | Hybrid 评测 |
+| `src/sage_rag/build_graph.py` | Evidence Unit → Standard Evidence Graph |
+| `src/evaluation/evaluate_sage_v5.py` | SAGE v5（BM25 semantic + risk-aware） |
+| `src/evaluation/evaluate_sage_dense_graph.py` | ★ Dense+Graph / Hybrid / Ablation |
+| `src/evaluation/analyze_expanded_bottleneck.py` | Expanded gold 排序瓶颈分析 |
+| `scripts/evaluate_clean_benchmark.py` | Clean 集 Dense/BM25/Hybrid |
+| `scripts/run_root_cause_analysis_clean.py` | Clean RCA + Design Motivation |
 | `scripts/build_qa_clean.py` | 剔除 Dataset Issue → Clean QA |
-| `scripts/evaluate_clean_benchmark.py` | Clean 集上跑 Dense/BM25/Hybrid |
-| `scripts/run_root_cause_analysis.py` | V2 Root Cause（含 Dataset Issue） |
-| `scripts/run_root_cause_analysis_clean.py` | ★ Clean Root Cause + Motivation |
-| `scripts/audit_qa_alignment.py` | QA–Gold 对齐审计 |
-| `scripts/rewrite_misaligned_qa.py` | 批量改写错位问题 |
-| `scripts/compare_*` | 基线对比报告 |
 
 ---
 
-## 主实验结果（Clean Benchmark）
+## SAGE 流水线演进
 
-460 queries，top_k=10。相对排序：**BM25 > Hybrid > Dense**。
+```
+query
+  → BM25 initial retrieval (initial_k=20)
+  → Graph Expansion (depth=1: parent_of / refers_to / next_to)
+  → Candidate merge + dedup          # pool recall ≈ 91.5%
+  → Relevance rescoring
+        · v5: BM25 semantic
+        · Dense+Graph: BGE-M3 cosine（复用 embeddings.npy，不重建索引）
+  → Structure-aware ranking
+        Final = α·Rel + β·Graph + γ·Coverage − λ·Risk
+        Hybrid 分析变体: 0.25·BM25 + 0.25·Dense + 0.25·Graph + 0.25·Coverage
+  → Top-10
+```
 
-| Retriever | Recall@1 | Recall@5 | Recall@10 | MRR |
-|-----------|---------:|---------:|----------:|----:|
-| BM25 | **0.5435** | **0.7652** | **82.61%** | **0.6439** |
-| Hybrid (RRF) | 0.4783 | 0.7152 | 78.26% | 0.5777 |
-| Dense (BGE-M3) | 0.3913 | 0.5674 | 65.43% | 0.4698 |
+| 版本 | 核心改动 | R@10 | Expand-gold → Top10 |
+|------|----------|-----:|--------------------:|
+| Expansion only | 不重排 | pool 91.52% | — |
+| v2 Greedy | 结构选择 | ~82.61% | 很少 |
+| v3 Allocation | 硬 7+3 槽位 | ~81–82% | 有，但挤掉 BM25 gold |
+| v4 Risk-aware | −Risk + inherit | 82.83% | 仍很少 |
+| v5 Semantic | BM25 rescore, k=20 | **85.00%** | **0 / 20** |
+| Dense ranking (A) | Dense 作主 relevance | 80.43% | **6 / 20 (30%)** |
+| Hybrid (H) | BM25+Dense+Graph | **86.09%** | （融合保底+校准） |
 
-与原始 V2（492）对比：清洗后三条基线 Recall@10 约 **+3.4 ~ +4.1 pp**（部分失败来自标注噪声）。详见 [results/retrieval/clean_benchmark/comparison.md](results/retrieval/clean_benchmark/comparison.md)。
-
-### Clean Hybrid 失败归因（100 misses，已排除 Dataset Issue）
-
-| Failure Type | Count | % |
-|--------------|------:|--:|
-| Document Identity / Version Disambiguation | 37 | 37% |
-| Appendix Retrieval Failure | 25 | 25% |
-| Semantic Misunderstanding | 25 | 25% |
-| Cross-reference Failure | 7 | 7% |
-| Hierarchy Structure Failure | 3 | 3% |
-| Table / Structured Content Failure | 3 | 3% |
-
-→ 动机：Version Relation / Appendix Links / Cross-reference Graph / Hierarchy Graph / Table Nodes。详见 [results/root_cause_analysis_clean/design_motivation.md](results/root_cause_analysis_clean/design_motivation.md)。
+默认权重（与 v5 对齐，未为刷分调参）：α=0.5，β=0.25，γ=0.25，λ=0.2。
 
 ---
 
-## Standard Evidence Graph（已完成）
+## Standard Evidence Graph
 
 由 Evidence Units 构建轻量异构结构图 `G=(V,E)`，**不使用 LLM 抽实体**，只利用标准文档显式结构。
 
-| 节点 | id 约定 | 数量 |
-|------|---------|-----:|
-| document | `{document_id}` | 13 |
-| chapter | `{doc}::chapter::{chapter_id}` | 81 |
-| clause | `{doc}::clause::{parent_clause}` | 500 |
-| evidence | `{unit_id}`（不变） | 565 |
-
-| 边 | 含义 | 权重 | 数量 |
-|----|------|-----:|-----:|
-| `parent_of` | document → chapter → clause → evidence | 1.0 | 1147 |
-| `next_to` | 同章相邻条款 | 0.3 | 420 |
-| `refers_to` | 规则匹配交叉引用（见 / 参见 / 附录 / GB/T / ISO） | 0.5 | 245 |
+| 节点 | 数量 | 边 | 权重 | 数量 |
+|------|-----:|----|-----:|-----:|
+| document / chapter / clause / evidence | 13 / 81 / 500 / 565 | `parent_of` | 1.0 | 1147 |
+| | | `next_to` | 0.3 | 420 |
+| | | `refers_to` | 0.5 | 245 |
 
 ```bash
 python src/sage_rag/build_graph.py \
   --input data/evidence_units/evidence_units.jsonl \
   --output data/sage_graph
 ```
-
-产出：`data/sage_graph/{nodes,edges}.jsonl`、`graph_statistics.md`，并同步 `results/sage_graph_statistics.md`。
 
 ---
 
@@ -163,37 +189,34 @@ python src/sage_rag/build_graph.py \
 ```bash
 git clone <your-repo-url>
 cd sage_rag
-# 推荐 conda 环境（需 faiss-cpu）；或 venv + pip
 pip install -r requirements.txt
 ```
 
 - FAISS 冲突时：`pip uninstall faiss faiss-cpu -y` 后安装 `faiss-cpu==1.9.0.post1`
 - HuggingFace 超时：`$env:HF_HUB_OFFLINE = "1"`（PowerShell）
 - PowerShell 请用 `;` 分隔命令，不要用 `&&`
+- 评测推荐环境：含 `jieba` / `faiss` / `sentence-transformers` 的 conda env
 
 ---
 
-## 快速复现（索引已存在时）
+## 快速复现
 
 ```bash
-# A. Clean Benchmark 评测（论文主表）
+# A. Clean Benchmark 基线
 python scripts/build_qa_clean.py
 python scripts/evaluate_clean_benchmark.py
 python scripts/run_root_cause_analysis_clean.py
 
-# B. 原始 V2 三基线（对照）
-python evaluate_dense.py --qa data/qa_dataset/qa_pairs_v2.jsonl --top-k 10 \
-  --output results/retrieval/dense/retrieval_results_v2.jsonl \
-  --report results/retrieval/dense/retrieval_dense_report_v2.md
-python evaluate_bm25.py --qa data/qa_dataset/qa_pairs_v2.jsonl --top-k 10
-python scripts/evaluate_hybrid.py --qa data/qa_dataset/qa_pairs_v2.jsonl --top-k 10
-python scripts/compare_hybrid_baselines.py
-python scripts/run_root_cause_analysis.py
-
-# C. Standard Evidence Graph（SAGE-RAG 图构建）
+# B. Standard Evidence Graph
 python src/sage_rag/build_graph.py \
   --input data/evidence_units/evidence_units.jsonl \
   --output data/sage_graph
+
+# C. SAGE v5
+python src/evaluation/evaluate_sage_v5.py
+
+# D. Dense+Graph 实验（含 ablation A/B/C/D + Hybrid）
+python src/evaluation/evaluate_sage_dense_graph.py
 ```
 
 ### 从 PDF 完整重建
@@ -205,8 +228,7 @@ python src/sage_rag/build_graph.py \
 | 3 结构图 | `python src/sage_rag/build_graph.py --input data/evidence_units/evidence_units.jsonl --output data/sage_graph` | `sage_graph/` |
 | 4 Dense 索引 | `python src/embedding/build_index.py --input data/evidence_units/evidence_units.jsonl --output data/vector_store` | `vector_store/` |
 | 5 BM25 索引 | `python scripts/build_bm25_index.py` | `bm25_index/` |
-| 6 QA V2 | `python scripts/regenerate_qa.py --full -o data/qa_dataset/qa_pairs_v2.jsonl` | `qa_pairs_v2.jsonl` |
-| 7 Clean + 评测 | 见上方「快速复现 A」 | `clean_benchmark/` 等 |
+| 6 Clean + 评测 | 见上方「快速复现 A / C / D」 | `clean_benchmark/` 等 |
 
 ---
 
@@ -218,7 +240,7 @@ python src/sage_rag/build_graph.py \
 data/
 ├── evidence_units/evidence_units.jsonl   # 565
 ├── sage_graph/                           # Standard Evidence Graph
-├── vector_store/                         # FAISS
+├── vector_store/                         # FAISS + embeddings.npy
 ├── bm25_index/
 └── qa_dataset/
     ├── qa_pairs_v2.jsonl                 # 492
@@ -238,26 +260,22 @@ data/
 
 | 用途 | 路径 |
 |------|------|
-| Clean 主表指标 | `results/retrieval/clean_benchmark/*_metrics.json` |
-| Clean vs V2 对比 | `results/retrieval/clean_benchmark/comparison.md` |
-| Clean 失败分布 | `results/root_cause_analysis_clean/root_cause_clean_statistics.md` |
-| Clean 失败案例 | `results/root_cause_analysis_clean/root_cause_clean_examples.md` |
+| Clean 主表指标 | `results/retrieval/clean_benchmark/` |
+| SAGE v5 | `results/retrieval/sage_v5/` |
+| Dense+Graph 实验 | `results/retrieval/sage_dense_graph/` |
+| Expanded 瓶颈分析 | `results/retrieval/` 下 `expanded_candidate_analysis.md`（若已生成） |
+| Clean 失败分布 / 案例 | `results/root_cause_analysis_clean/` |
 | Design Motivation | `results/root_cause_analysis_clean/design_motivation.md` |
 | 结构图统计 | `results/sage_graph_statistics.md` |
-| V2 三基线对比 | `results/retrieval/hybrid_vs_baselines.md` |
-| QA 清洗日志 | `results/retrieval/clean_benchmark/cleaning_log.md` |
-| QA 对齐/改写 | `results/qa_quality/` |
+| QA 清洗 / 对齐 | `results/qa_quality/`、`results/retrieval/clean_benchmark/cleaning_log.md` |
 
 ---
 
 ## 下一步
 
-在 Standard Evidence Graph 之上实现 **SAGE-RAG 结构感知检索**，并在 Clean Benchmark 上与 BM25 / Dense / Hybrid 对比：
+把 Dense 作为 **expanded 证据校准项** 接入正式 SAGE 流水线（保留 BM25 主 relevance），而不是用 Dense 单独终排；可选：对 `next_to` 边降权或阈值门控，以及论文表格 / ablation 定稿。
 
-1. Hierarchy-aware retrieval（沿 `parent_of` / `next_to` 扩展）  
-2. Cross-reference expansion（沿 `refers_to`）  
-3. Appendix / Table 定向召回  
-4. Document / Version 消歧  
+暂不为刷分调参；当前默认权重与 v5 对齐，用于验证假设。
 
 ---
 
